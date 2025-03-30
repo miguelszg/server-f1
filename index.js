@@ -66,23 +66,30 @@ async function startServer() {
 
     app.post('/api/register', async (req, res) => {
         try {
-          const { nombre, correo, contraseña } = req.body;
-      
-          // Verificar si el correo ya está registrado
-          const existingUser = await User.findOne({ correo });
-          if (existingUser) {
-            return res.status(400).json({ error: 'El correo ya está registrado' });
-          }
-      
-          // Crear un nuevo usuario
-          const newUser = new User({ nombre, correo, contraseña });
-          await newUser.save();
-          res.status(201).json({ message: 'Usuario registrado correctamente' });
-      
+            const { nombre, correo, contraseña } = req.body;
+            const db = mongoClient.db('test'); // Ajusta el nombre de la base de datos
+            const usersCollection = db.collection('users');
+    
+            // Verificar si el correo ya está registrado
+            const existingUser = await usersCollection.findOne({ correo });
+            if (existingUser) {
+                return res.status(400).json({ error: 'El correo ya está registrado' });
+            }
+    
+            // Encriptar la contraseña antes de guardarla
+            const hashedPassword = await bcrypt.hash(contraseña, 10);
+    
+            // Guardar usuario en la base de datos
+            const newUser = { nombre, correo, contraseña: hashedPassword };
+            await usersCollection.insertOne(newUser);
+    
+            res.status(201).json({ message: 'Usuario registrado correctamente' });
         } catch (error) {
-          res.status(500).json({ error: 'Error al registrar usuario' });
+            console.error('Error al registrar usuario:', error);
+            res.status(500).json({ error: 'Error al registrar usuario' });
         }
-      });
+    });
+    
 
     // 📌 API para iniciar sesión    
 
