@@ -37,7 +37,14 @@ async function startServer() {
     const mongoClient = await connectToMongo();
     const app = express();
 
-    app.use(cors());
+    app.use(cors({
+        origin: '*',
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+        preflightContinue: false,
+        optionsSuccessStatus: 204
+      }));
+      
     app.use(express.json());
 
     const PORT = process.env.PORT || 5000;
