@@ -43,6 +43,10 @@ async function startServer() {
     const PORT = process.env.PORT || 5000;
 
 
+    app.get('/', (req, res) => {
+        res.send('Hello from the server!');
+    });
+
     //SSE
     app.get('/api/stream', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
