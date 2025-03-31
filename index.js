@@ -308,63 +308,74 @@ app.get('/api/calendar/:id', async (req, res) => {
 // User route
 app.get('/api/user/:userId', async (req, res) => {
   let { userId } = req.params;
-
+  
   try {
-      if (!ObjectId.isValid(userId)) {
+      console.log('🔹 User ID recibido:', userId);
+
+      // Verifica si el ID es válido antes de convertirlo en ObjectId
+      if (!ObjectId.isValid(userId.trim())) {
           return res.status(400).json({ error: 'ID de usuario no válido' });
       }
 
-      const user = await connectToMongo.db().collection('users').findOne({ _id: new ObjectId(userId) });
+      // Convierte userId en ObjectId antes de la consulta
+      const user = await connectToMongo
+          .db()
+          .collection('users')
+          .findOne({ _id: new ObjectId(userId.trim()) });
 
       if (!user) {
           return res.status(404).json({ error: 'Usuario no encontrado' });
       }
 
-      res.json(user);
+      console.log('✅ Usuario encontrado:', user);
+      
+      res.json({
+          _id: user._id.toString(),
+          nombre: user.nombre,
+          correo: user.correo,
+          descripcion: user.descripcion
+      });
   } catch (error) {
-      console.error('Error al obtener datos del usuario:', error);
-      res.status(500).json({ error: 'Error al obtener datos del usuario' });
+      console.error('❌ Error al obtener datos del usuario:', error.message);
+      res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
 // Update user route
-const { ObjectId } = require('mongodb'); // Asegurar que estás importando esto
+app.put('/api/user/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { nombre, descripcion } = req.body;
 
-app.get('/api/user/:userId', async (req, res) => {
-    let { userId } = req.params;
-    
-    try {
-        console.log('🔹 User ID recibido:', userId);
-
-        // Verifica si el ID es válido antes de convertirlo en ObjectId
-        if (!ObjectId.isValid(userId.trim())) {
-            return res.status(400).json({ error: 'ID de usuario no válido' });
-        }
-
-        // Convierte userId en ObjectId antes de la consulta
-        const user = await connectToMongo
-            .db()
-            .collection('users')
-            .findOne({ _id: new ObjectId(userId.trim()) });
-
-        if (!user) {
-            return res.status(404).json({ error: 'Usuario no encontrado' });
-        }
-
-        console.log('✅ Usuario encontrado:', user);
-        
-        res.json({
-            _id: user._id.toString(), // Para evitar problemas con el formato en el frontend
-            nombre: user.nombre,
-            correo: user.correo,
-            descripcion: user.descripcion
-        });
-    } catch (error) {
-        console.error('❌ Error al obtener datos del usuario:', error.message);
-        res.status(500).json({ error: 'Error interno del servidor' });
+  try {
+    const { db } = await connectToMongo();
+    if (!ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'ID de usuario no válido' });
     }
-});
 
+    const user = await db.collection('users').findOne({ _id: new ObjectId(userId) });
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    if (user.nombre === nombre && user.descripcion === descripcion) {
+      return res.status(400).json({ error: 'No se realizaron cambios' });
+    }
+
+    const result = await db.collection('users').updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { nombre, descripcion } }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(400).json({ error: 'No se realizaron cambios' });
+    }
+
+    res.status(200).json({ message: 'Perfil actualizado con éxito' });
+  } catch (error) {
+    console.error('Error al actualizar el perfil:', error);
+    res.status(500).json({ error: 'Error al actualizar el perfil' });
+  }
+});
 
 // News routes
 app.get('/api/news', async (req, res) => {
