@@ -306,38 +306,32 @@ app.get('/api/calendar/:id', async (req, res) => {
 });
 
 // User route
-app.get('/api/user/:userId', async (req, res) => {
-  let { userId } = req.params;
-  
+app.get('/api/user/:id', async (req, res) => {
   try {
-      console.log('🔹 User ID recibido:', userId);
+      const { id } = req.params;
+      const { db } = await connectToMongo();
 
-      // Verifica si el ID es válido antes de convertirlo en ObjectId
-      if (!ObjectId.isValid(userId.trim())) {
-          return res.status(400).json({ error: 'ID de usuario no válido' });
+      if (!ObjectId.isValid(id)) {
+          return res.status(400).json({ message: 'ID no válido' });
       }
 
-      // Convierte userId en ObjectId antes de la consulta
-      const user = await connectToMongo
-          .db()
-          .collection('users')
-          .findOne({ _id: new ObjectId(userId.trim()) });
+      const user = await db.collection('users').findOne({ _id: new ObjectId(id) });
 
       if (!user) {
-          return res.status(404).json({ error: 'Usuario no encontrado' });
+          return res.status(404).json({ message: 'Usuario no encontrado' });
       }
 
-      console.log('✅ Usuario encontrado:', user);
-      
-      res.json({
-          _id: user._id.toString(),
+      // Solo enviamos los campos necesarios al frontend
+      const userData = {
           nombre: user.nombre,
           correo: user.correo,
           descripcion: user.descripcion
-      });
+      };
+
+      res.json(userData);
   } catch (error) {
-      console.error('❌ Error al obtener datos del usuario:', error.message);
-      res.status(500).json({ error: 'Error interno del servidor' });
+      console.error('Error al obtener el usuario:', error);
+      res.status(500).json({ message: 'Error al obtener el usuario' });
   }
 });
 
