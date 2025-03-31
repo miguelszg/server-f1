@@ -310,20 +310,20 @@ app.get('/api/user/:userId', async (req, res) => {
   let { userId } = req.params;
 
   try {
-    const { db } = await connectToMongo();
-    if (!ObjectId.isValid(userId)) {
-      return res.status(400).json({ error: 'ID de usuario no válido' });
-    }
+      if (!ObjectId.isValid(userId)) {
+          return res.status(400).json({ error: 'ID de usuario no válido' });
+      }
 
-    const user = await db.collection('users').findOne({ _id: new ObjectId(userId) });
-    if (!user) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
+      const user = await connectToMongo.db().collection('users').findOne({ _id: new ObjectId(userId) });
 
-    res.json(user);
+      if (!user) {
+          return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+
+      res.json(user);
   } catch (error) {
-    console.error('Error al obtener datos del usuario:', error);
-    res.status(500).json({ error: 'Error al obtener datos del usuario' });
+      console.error('Error al obtener datos del usuario:', error);
+      res.status(500).json({ error: 'Error al obtener datos del usuario' });
   }
 });
 
@@ -488,74 +488,6 @@ app.get('/api/articles/:id/comments', async (req, res) => {
   }
 });
 
-app.put('/api/comments/:commentId', async (req, res) => {
-  try {
-    const { commentId } = req.params;
-    const { userId, comment } = req.body;
-    const { db } = await connectToMongo();
-
-    if (!ObjectId.isValid(commentId) || !ObjectId.isValid(userId)) {
-      return res.status(400).json({ error: 'ID no válido' });
-    }
-
-    if (!comment.trim()) {
-      return res.status(400).json({ error: 'El comentario no puede estar vacío' });
-    }
-
-    const article = await db.collection('carousel').findOne({ 'comments._id': new ObjectId(commentId) });
-    if (!article) {
-      return res.status(404).json({ error: 'Comentario no encontrado' });
-    }
-
-    const commentToUpdate = article.comments.find(c => c._id.toString() === commentId);
-    if (commentToUpdate.userId.toString() !== userId) {
-      return res.status(403).json({ error: 'No tienes permiso para editar este comentario' });
-    }
-
-    await db.collection('carousel').updateOne(
-      { _id: new ObjectId(article._id) },
-      { $set: { 'comments.$[elem].comment': comment, 'comments.$[elem].updatedAt': new Date() } },
-      { arrayFilters: [{ 'elem._id': new ObjectId(commentId) }] }
-    );
-
-    res.json({ message: 'Comentario actualizado correctamente' });
-  } catch (error) {
-    console.error('Error al editar el comentario:', error);
-    res.status(500).json({ error: 'Error al editar el comentario' });
-  }
-});
-
-app.delete('/api/comments/:commentId', async (req, res) => {
-  try {
-    const { commentId } = req.params;
-    const { userId } = req.body;
-    const { db } = await connectToMongo();
-
-    if (!ObjectId.isValid(commentId) || !ObjectId.isValid(userId)) {
-      return res.status(400).json({ error: 'ID no válido' });
-    }
-
-    const article = await db.collection('carousel').findOne({ 'comments._id': new ObjectId(commentId) });
-    if (!article) {
-      return res.status(404).json({ error: 'Comentario no encontrado' });
-    }
-
-    const commentToDelete = article.comments.find(c => c._id.toString() === commentId);
-    if (commentToDelete.userId.toString() !== userId) {
-      return res.status(403).json({ error: 'No tienes permiso para eliminar este comentario' });
-    }
-
-    await db.collection('carousel').updateOne(
-      { _id: new ObjectId(article._id) },
-      { $pull: { comments: { _id: new ObjectId(commentId) } } }
-    );
-
-    res.json({ message: 'Comentario eliminado correctamente' });
-  } catch (error) {
-    console.error('Error al eliminar el comentario:', error);
-    res.status(500).json({ error: 'Error al eliminar el comentario' });
-  }
-});
 
 // Create an SSE endpoint
 app.get('/api/stream', (req, res) => {
@@ -578,5 +510,4 @@ app.get('/api/stream', (req, res) => {
   });
 });
 
-// Export a serverless function handler for Vercel
 export default app;
