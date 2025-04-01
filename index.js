@@ -210,40 +210,50 @@ app.post('/api/report', async (req, res) => {
 });
 
 // Verify MFA route
-app.post('/api/verify-mfa', async (req, res) => {
-  const { correo, code } = req.body;
+app.post('/api/login', async (req, res) => {
+  const { correo, contraseña } = req.body;
 
   try {
     const { db } = await connectToMongo();
     const user = await db.collection('users').findOne({ correo });
-    if (!user || !user.mfaSecret) {
-      return res.status(400).json({ error: 'MFA no configurado o no disponible' });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Usuario no encontrado' });
     }
 
-    const isValid = speakeasy.totp.verify({
-      secret: user.mfaSecret,
-      encoding: 'base32',
-      token: code,
-      window: 1,
-    });
-
-    if (!isValid) {
-      return res.status(400).json({ error: 'Código MFA incorrecto' });
+    const passwordMatch = await bcrypt.compare(contraseña, user.contraseña);
+    if (!passwordMatch) {
+      return res.status(400).json({ error: 'Contraseña incorrecta' });
     }
 
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
+    if (user.mfaSecret) {
+      // ✅ Si el usuario ya tiene MFA, solicitar código MFA
+      return res.status(200).json({ message: 'MFA requerido', requireMfa: true });
+    } else {
+      // ✅ Generar MFA solo si no tiene uno
+      const secret = speakeasy.generateSecret({ name: 'MyApp' });
 
-    return res.status(200).json({ 
-      message: 'Autenticación exitosa',
-      token,
-      userId: user._id,
-      role: user.role // Enviamos el role aquí
-    });
+      // 🔹 Guardar el secreto en la base de datos ANTES de generar el QR
+      await db.collection('users').updateOne(
+        { correo },
+        { $set: { mfaSecret: secret.base32 } }
+      );
 
+      // 🔹 Ahora generamos el código QR correctamente
+      const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+
+      return res.status(200).json({
+        message: 'Configura MFA',
+        qrCodeUrl, // ✅ La imagen del QR se genera correctamente
+        role: user.role,
+      });
+    }
   } catch (error) {
-    res.status(500).json({ error: 'Error al verificar el código MFA' });
+    console.error('Error en el login:', error);
+    res.status(500).json({ error: 'Error al iniciar sesión' });
   }
 });
+
 
 // Carousel route
 app.get('/api/carousel', async (req, res) => {
