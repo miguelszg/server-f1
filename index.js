@@ -232,7 +232,14 @@ app.post('/api/verify-mfa', async (req, res) => {
     }
 
     const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
-    res.status(200).json({ message: 'Autenticación exitosa', token, userId: user._id });
+
+    return res.status(200).json({ 
+      message: 'Autenticación exitosa',
+      token,
+      userId: user._id,
+      role: user.role // Enviamos el role aquí
+    });
+
   } catch (error) {
     res.status(500).json({ error: 'Error al verificar el código MFA' });
   }
