@@ -90,6 +90,7 @@ app.post('/api/login', async (req, res) => {
   try {
     const { db } = await connectToMongo();
     const user = await db.collection('users').findOne({ correo });
+
     if (!user) {
       return res.status(400).json({ error: 'Usuario no encontrado' });
     }
@@ -98,16 +99,23 @@ app.post('/api/login', async (req, res) => {
     if (!passwordMatch) {
       return res.status(400).json({ error: 'Contraseña incorrecta' });
     }
-    
+
+    // Generar y actualizar MFA
     const secret = speakeasy.generateSecret({ name: 'MyApp' });
-    
     await db.collection('users').updateOne(
       { correo },
-      { $set: { mfaSecret: secret.base32 } } 
+      { $set: { mfaSecret: secret.base32 } }
     );
 
     const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
-    return res.status(200).json({ message: 'Configura MFA', qrCodeUrl });
+
+    // Retornar role en la respuesta
+    return res.status(200).json({
+      message: 'Configura MFA',
+      qrCodeUrl,
+      role: user.role, // Aquí enviamos el role
+    });
+
   } catch (error) {
     console.error('Error en el login:', error);
     res.status(500).json({ error: 'Error al iniciar sesión' });
