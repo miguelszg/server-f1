@@ -73,7 +73,13 @@ app.post('/api/register', async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(contraseña, 10);
-    const newUser = { nombre, correo, contraseña: hashedPassword };
+    const newUser = { 
+      nombre, 
+      correo, 
+      contraseña: hashedPassword,
+      role: 2  // Asignar el valor por defecto de role como 2
+    };
+
     await usersCollection.insertOne(newUser);
 
     res.status(201).json({ message: 'Usuario registrado correctamente' });
@@ -82,6 +88,7 @@ app.post('/api/register', async (req, res) => {
     res.status(500).json({ error: 'Error al registrar usuario' });
   }
 });
+
 
 // Login route
 app.post('/api/login', async (req, res) => {
