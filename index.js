@@ -100,30 +100,35 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ error: 'Contraseña incorrecta' });
     }
 
+    // 🔹 Verificar si ya tiene un secreto MFA
+    let secret;
     if (user.mfaSecret) {
-      // Si el usuario ya tiene MFA configurado, solicitar código MFA
-      return res.status(200).json({ message: 'MFA requerido', requireMfa: true });
+      secret = { base32: user.mfaSecret };
     } else {
-      // Si el usuario no tiene MFA, generarlo
-      const secret = speakeasy.generateSecret({ name: 'MyApp' });
+      secret = speakeasy.generateSecret({ name: 'MyApp' });
+
       await db.collection('users').updateOne(
         { correo },
         { $set: { mfaSecret: secret.base32 } }
       );
-
-      const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
-
-      return res.status(200).json({
-        message: 'Configura MFA',
-        qrCodeUrl,
-        role: user.role,
-      });
     }
+
+    // 🔹 Generar código QR a partir del secreto MFA (ahora siempre existirá)
+    const otpauth_url = `otpauth://totp/MyApp?secret=${secret.base32}&issuer=MyApp`;
+    const qrCodeUrl = await qrcode.toDataURL(otpauth_url);
+
+    return res.status(200).json({
+      message: 'Configura MFA',
+      qrCodeUrl, // ✅ Ahora siempre se generará correctamente
+      role: user.role, // ✅ Se incluye el role en la respuesta
+    });
+
   } catch (error) {
     console.error('Error en el login:', error);
     res.status(500).json({ error: 'Error al iniciar sesión' });
   }
 });
+
 
 
 
@@ -210,53 +215,40 @@ app.post('/api/report', async (req, res) => {
 });
 
 // Verify MFA route
-app.post('/api/login', async (req, res) => {
-  const { correo, contraseña } = req.body;
+app.post('/api/verify-mfa', async (req, res) => {
+  const { correo, code } = req.body;
 
   try {
     const { db } = await connectToMongo();
     const user = await db.collection('users').findOne({ correo });
-
-    if (!user) {
-      return res.status(400).json({ error: 'Usuario no encontrado' });
+    if (!user || !user.mfaSecret) {
+      return res.status(400).json({ error: 'MFA no configurado o no disponible' });
     }
 
-    const passwordMatch = await bcrypt.compare(contraseña, user.contraseña);
-    if (!passwordMatch) {
-      return res.status(400).json({ error: 'Contraseña incorrecta' });
+    const isValid = speakeasy.totp.verify({
+      secret: user.mfaSecret,
+      encoding: 'base32',
+      token: code,
+      window: 1,
+    });
+
+    if (!isValid) {
+      return res.status(400).json({ error: 'Código MFA incorrecto' });
     }
 
-    // 🔹 Verificar si ya tiene un secreto MFA
-    let secret;
-    if (user.mfaSecret) {
-      secret = { base32: user.mfaSecret };
-    } else {
-      secret = speakeasy.generateSecret({ name: 'MyApp' });
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
 
-      await db.collection('users').updateOne(
-        { correo },
-        { $set: { mfaSecret: secret.base32 } }
-      );
-    }
-
-    // 🔹 Generar código QR a partir del secreto MFA (ahora siempre existirá)
-    const otpauth_url = `otpauth://totp/MyApp?secret=${secret.base32}&issuer=MyApp`;
-    const qrCodeUrl = await qrcode.toDataURL(otpauth_url);
-
-    return res.status(200).json({
-      message: 'Configura MFA',
-      qrCodeUrl, // ✅ Ahora siempre se generará correctamente
-      role: user.role, // ✅ Se incluye el role en la respuesta
+    return res.status(200).json({ 
+      message: 'Autenticación exitosa',
+      token,
+      userId: user._id,
+      role: user.role // Enviamos el role aquí
     });
 
   } catch (error) {
-    console.error('Error en el login:', error);
-    res.status(500).json({ error: 'Error al iniciar sesión' });
+    res.status(500).json({ error: 'Error al verificar el código MFA' });
   }
 });
-
-
-
 
 // Carousel route
 app.get('/api/carousel', async (req, res) => {
