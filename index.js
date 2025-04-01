@@ -109,11 +109,11 @@ app.post('/api/login', async (req, res) => {
 
     const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
 
-    // Retornar role en la respuesta
+    // Enviar respuesta con MFA y el rol del usuario
     return res.status(200).json({
       message: 'Configura MFA',
       qrCodeUrl,
-      role: user.role, // Aquí enviamos el role
+      role: user.role, // Asegurar que se envía el role
     });
 
   } catch (error) {
@@ -121,6 +121,7 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ error: 'Error al iniciar sesión' });
   }
 });
+
 
 // Forgot password route
 app.post('/api/forgot-password', async (req, res) => {
