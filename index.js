@@ -266,6 +266,39 @@ app.get('/api/carousel', async (req, res) => {
   }
 });
 
+//agregar noticia
+app.post('/api/carousel', async (req, res) => {
+  try {
+      const { title, description, image, detailedInfo } = req.body;
+
+      if (!title || !description || !image || !detailedInfo) {
+          return res.status(400).json({ error: 'Todos los campos son obligatorios' });
+      }
+
+      const { db } = await connectToMongo();
+      
+      const newNews = {
+          title,
+          description,
+          image,
+          link: '/articule', // Valor por defecto
+          detailedInfo,
+      };
+
+      const result = await db.collection('carousel').insertOne(newNews);
+
+      if (!result.acknowledged) {
+          throw new Error('Error al insertar la noticia');
+      }
+
+      res.status(201).json({ message: 'Noticia agregada exitosamente' });
+  } catch (error) {
+      console.error('Error al insertar noticia:', error);
+      res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+
 // Articles route
 app.get('/api/articles/:id', async (req, res) => {
   try {
