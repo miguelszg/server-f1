@@ -226,33 +226,25 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ error: 'Contraseña incorrecta' });
     }
 
-    if (user.mfaSecret) {
-      // ✅ Si el usuario ya tiene MFA, solicitar código MFA
-      return res.status(200).json({ message: 'MFA requerido', requireMfa: true });
-    } else {
-      // ✅ Generar MFA solo si no tiene uno
-      const secret = speakeasy.generateSecret({ name: 'MyApp' });
+    // 🔹 Generar un nuevo secreto MFA en cada inicio de sesión
+    const secret = speakeasy.generateSecret({ name: 'MyApp' });
 
-      // 🔹 Guardar el secreto en la base de datos ANTES de generar el QR
-      await db.collection('users').updateOne(
-        { correo },
-        { $set: { mfaSecret: secret.base32 } }
-      );
+    // 🔹 Generar un nuevo código QR cada vez
+    const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
 
-      // 🔹 Ahora generamos el código QR correctamente
-      const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+    // 🔹 Devolver el QR y el rol del usuario
+    return res.status(200).json({
+      message: 'Configura MFA',
+      qrCodeUrl, // ✅ Siempre será un nuevo QR
+      role: user.role,
+    });
 
-      return res.status(200).json({
-        message: 'Configura MFA',
-        qrCodeUrl, // ✅ La imagen del QR se genera correctamente
-        role: user.role,
-      });
-    }
   } catch (error) {
     console.error('Error en el login:', error);
     res.status(500).json({ error: 'Error al iniciar sesión' });
   }
 });
+
 
 
 // Carousel route
