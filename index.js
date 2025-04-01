@@ -100,27 +100,31 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ error: 'Contraseña incorrecta' });
     }
 
-    // Generar y actualizar MFA
-    const secret = speakeasy.generateSecret({ name: 'MyApp' });
-    await db.collection('users').updateOne(
-      { correo },
-      { $set: { mfaSecret: secret.base32 } }
-    );
+    if (user.mfaSecret) {
+      // Si el usuario ya tiene MFA configurado, solicitar código MFA
+      return res.status(200).json({ message: 'MFA requerido', requireMfa: true });
+    } else {
+      // Si el usuario no tiene MFA, generarlo
+      const secret = speakeasy.generateSecret({ name: 'MyApp' });
+      await db.collection('users').updateOne(
+        { correo },
+        { $set: { mfaSecret: secret.base32 } }
+      );
 
-    const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+      const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
 
-    // Enviar respuesta con MFA y el rol del usuario
-    return res.status(200).json({
-      message: 'Configura MFA',
-      qrCodeUrl,
-      role: user.role, // Asegurar que se envía el role
-    });
-
+      return res.status(200).json({
+        message: 'Configura MFA',
+        qrCodeUrl,
+        role: user.role,
+      });
+    }
   } catch (error) {
     console.error('Error en el login:', error);
     res.status(500).json({ error: 'Error al iniciar sesión' });
   }
 });
+
 
 
 // Forgot password route
